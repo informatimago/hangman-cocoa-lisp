@@ -1,0 +1,54 @@
+Hangman - Nib-Less Cocoa Application in Common Lisp Example
+===========================================================
+
+
+This is an implementation of the hangman game for MacOSX / Cocoa,
+written in Common Lisp with ccl.
+
+
+This demonstrates a simple Cocoa application written with ccl, without
+using xib/nib files, but constructing the user interface entirely
+programmatically (cf files nsapi.lisp and hangman-controller.lisp).
+
+
+Development
+-----------
+
+The program can be loaded with quicklisp in arunning ccl image for
+development and debugging.  Note
+
+    (push #P"~/src/hangman/src/" asdf:*central-registry*)
+    (ql:quickload :com.informatimago.hangman)
+    (in-package :com.informatimago.hangman.cocoa)
+    (objcl:set-objective-cl-syntax)
+    (progn
+      (setf *controller* [[HangmanController alloc] init])
+      [*controller* createUI]
+      (initialize-game *controller*))
+
+after modifications, one can reset it with:
+
+   (progn
+     [*controller* dropUI]
+     [*controller* createUI]
+     (initialize-game *controller*))
+
+
+Production
+----------
+
+To generate the application package, with the Makefile:
+
+    make
+
+This generates an application package on the desktop named
+Hangman.app, using the generate-application.lisp script.
+
+
+
+License
+-------
+
+This program is distributed under the GNU AFFERO GENERAL PUBLIC
+LICENSE, Version 3.  Cf. file COPYING.
+

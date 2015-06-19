@@ -1,0 +1,62 @@
+Write a hangman game
+====================
+
+The program shall read a word list from a file.
+Words are sequences of alphabetic letters, at least 3 letters.
+
+The program shall display the first and last letter of the word, and
+hide the intermediary letters behind a mark.
+
+         H e l l o
+         H _ _ _ o
+
+The player chooses a letter.
+
+If that letter is in the word and hidden, 
+then all occurences are revealed, 
+else if the letter was already tried, then a message is displayed
+else the error count is incremented.
+
+The error count is displayed as a graphical representation of a hangman:
+
+
+
+                         _________        _________      _________
+             |           |                |     |        |     |
+             |           |                |              |     o
+             |           |                |              |
+             |           |                |              |
+             |           |                |              |
+             |           |                |              |
+             |           |                |              |
+______     __|____     __|____          __|____        __|____
+1          2           3                4              5
+
+  _________       _________      _________     _________      _________
+  |     |         |     |        |     |       |     |        |     |
+  |     o         |     o        |     o       |     o        |     o
+  |     |         |    /|        |    /|\      |    /|\       |    /|\
+  |     |         |     |        |     |       |     |        |     |
+  |               |              |             |    /         |    / \
+  |               |              |             |              |
+  |               |              |             |              |
+__|____         __|____        __|____       __|____        __|____
+6               7              8             9              10           
+
+    _________  
+    |     |    
+    |     o_    
+    |    /|\   
+    |     |    
+    |    / \   
+    |          
+    |          
+  __|____      
+  11           
+
+
+When the error count reaches 11, the man is hung and the game is lost.
+When all the letters are guessed, the man is saved and the game is won.
+
+
+
