@@ -40,7 +40,7 @@
     (dolist (arg args)
       (insert (format "%S\n" arg)))
     (insert "&allow-other-keys)\n")
-    (insert "(call-next-method)\n")
+    (insert "(when (next-method-p) (call-next-method))\n")
     (dolist (set sets)
       (insert (format "%S\n" set)))
     (insert "self")))

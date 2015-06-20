@@ -276,6 +276,15 @@ size list -> NSSize
 point list -> NSPoint
 "))
 
+(defmethod configure ((self ns:ns-responder)
+                      &key
+                        (next-responder nil next-responder-p)
+                        (menu nil menu-p)
+                      &allow-other-keys)
+  (when (next-method-p) (call-next-method))
+  (when next-responder-p [self setNextResponder: next-responder])
+  (when menu-p [self setMenu: menu])
+  self)
 
 (defmethod configure ((self ns:ns-view)
                       &key
@@ -643,5 +652,91 @@ point list -> NSPoint
                  defer: (nsbool defer)]))
     (apply (function configure) window keys)
     window))
+
+
+
+(defun ns-key-equivalent-modifier-mask (keywords)
+  (loop
+    :with m = 0
+    :for k :in keywords
+    :do (setf m (logior m (ecase k
+                            ((:shift) #$NSShiftKeyMask)
+                            ((:option :alternate) #$NSAlternateKeyMask)
+                            ((:command) #$NSCommandKeyMask)
+                            ((:control) #$NSControlKeyMask))))
+    :finally (return m)))
+
+(defmacro item (title &optional selector key-equivalent)
+  (cond ((null    key-equivalent))
+        ((stringp key-equivalent))
+        ((listp   key-equivalent)
+         (assert (= 1 (count-if (function stringp) key-equivalent))
+                 (key-equivalent)
+                 "Invalid key-equivalent: ~S~%Must be a string or a list containing a string and modifier keywords."
+                 key-equivalent)
+         (assert (every (lambda (k) (or (stringp k)
+                                        (member k '(:shift :option :alternate :command :control))))
+                        key-equivalent)
+                 (key-equivalent)
+                 "Invalid key-equivalent: ~S~%Must be a string or a list containing a string and modifier keywords."
+                 key-equivalent))
+        (t (error "Invalid key-equivalent: ~S~%Must be a string or a list containing a string and modifier keywords."
+                  key-equivalent)))
+  (let ((item `(let ((title  (objcl:objc-string ,title))
+                     (action ,(if (null selector)
+                                  'oclo:*null*
+                                  `(oclo:@selector ,selector)))
+                     (key-equivalent ,(cond
+                                        ((null key-equivalent)    `(objcl:objc-string ""))
+                                        ((stringp key-equivalent) `(objcl:objc-string ,key-equivalent))
+                                        ((listp key-equivalent)   `(objcl:objc-string ,(find-if (function stringp) key-equivalent))))))
+                 [[[NSMenuItem alloc] initWithTitle: title action: action keyEquivalent: key-equivalent] autorelease])))
+    (if (consp key-equivalent)
+        `(let ((item ,item)
+               (mask ,(ns-key-equivalent-modifier-mask (remove-if-not (function keywordp) key-equivalent))))
+           [item setKeyEquivalentModifierMask: mask]
+           item)
+        item)))
+
+(defmacro menu (title &body items)
+  `(let* ((menu-title ,(if title
+                      `(objcl:objc-string ,title)
+                      `(objcl:objc-string "")))
+          (menu [[[NSMenu alloc] initWithTitle:menu-title] autorelease]))
+     ,@(mapcar (lambda (item-form)
+                 `(let ((item ,(cond
+                                 ((and (or (symbolp item-form) (stringp item-form))
+                                       (string= "-" item-form))
+                                  `[NSMenuItem separatorItem])
+                                 ((atom item-form)
+                                  (error "Invalid item: ~S" item-form))
+                                 (t (ecase (first item-form)
+                                      (menu `(let ((item (item ,(second item-form)))
+                                                   (menu ,item-form))
+                                               [item setSubmenu:menu]
+                                               item))
+                                      (item item-form))))))
+                    [menu addItem: item]))
+               items)
+     menu))
+
+
+
+(defun dictionary (&rest key-values &key &allow-other-keys)
+  (flet ((objclize (object)
+           (typecase object
+             (null       (objcl:objc-string "NO"))
+             ((member t) (objcl:objc-string "YES"))
+             (string     (objcl:objc-string object))
+             (symbol     (objcl:objc-string (symbol-name object)))
+             (t          object))))
+   (loop
+     :with dict = [NSMutableDictionary dictionaryWithCapacity: (truncate (length key-values) 2)]
+     :for (key value) :on key-values :by (function cddr)
+     :do (let ((key   (objclize key))
+               (value (objclize value)))
+           [dict setObject:value forKey:key])
+     :finally (return dict))))
+
 
 ;;; THE END;;;

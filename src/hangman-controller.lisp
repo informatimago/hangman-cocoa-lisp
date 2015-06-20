@@ -52,7 +52,9 @@
                         (hangman      :initarg :hangman      :accessor controller-hangman)
                         (words        :initarg :words        :accessor controller-words)
                         (loaded-words :initarg :loaded-words :accessor controller-loaded-words)
-                        (finished     :initarg :finished     :accessor controller-finished))])
+                        (finished     :initarg :finished     :accessor controller-finished)
+                        (game-counter :initform 0 :accessor controller-game-counter)
+                        (wins-counter :initform 0 :accessor controller-wins-counter))])
 
 
 
@@ -122,7 +124,9 @@
                                                :has-shadow t
                                                :delegate self
                                                :initial-first-responder self
+                                               :next-responder [NSApplication sharedApplication]
                                                :autodisplay t))
+  [(controller-window self) makeFirstResponder: self]
   (let ((win [(controller-window self) contentView]))
     (setf (controller-image self)   (make-image-view '(180 158 112 71)
                                                      :image-scaling :proportionally-down
@@ -178,16 +182,26 @@
           (controller-buttons self) '()))]
 
 
+
 (defun make-menu-bar ()
-  (let* ((empty   (objcl:objc-string ""))
-         (none    oclo:*null*)
-         (menubar [[NSMenu alloc] initWithTitle: empty])
-         (menu    [[NSMenu alloc] initWithTitle: empty]))
-    [menu addItemWithTitle:(objcl:objc-string "Quit")
-      action: (oclo:@selector "terminate:")
-      keyEquivalent:(objcl:objc-string "q")]
-    [[menubar addItemWithTitle: empty action: none keyEquivalent: empty] setSubmenu:menu]
-    menubar))
+  (menu "MenuBar"
+    (menu "Hangman"
+      (item "About Hangman" "orderFrontStandardAboutPanel:")
+      -
+      (menu "Services")
+      -
+      (item "Hide Hangman" "hide:" "h")
+      (item "Hide Others" "hideOtherApplications:" (:command :option "h"))
+      (item "Show All" "unhideAllApplications:")
+      -
+      (item "Quit Hangman" "terminate:" "q"))
+    (menu "Window"
+      (item "Minimize" "performMiniaturize:" "m")
+      (item "Zoom"     "performZoom:")
+      -
+      (item "Bring All to Front" "arrangeInFront:"))
+    (menu "Help"
+      (item "Hangman Help" "showHelp:" "?"))))
 
 
 ;; application delegate methods:
@@ -197,7 +211,10 @@
   resultType: (:void)
   body:
   (declare (ignore aNotification))
-  [[NSApplication sharedApplication] setMainMenu: (make-menu-bar)]
+  (let* ((main     (make-menu-bar))
+         (services [[[[main itemAtIndex:0] submenu] itemAtIndex:2] submenu]))
+    [[NSApplication sharedApplication] setMainMenu: main]
+    [[NSApplication sharedApplication] setServicesMenu:services])
   [self createUI]
   [(controller-window self) center]
   [(controller-window self) makeKeyAndOrderFront:nil]
@@ -228,6 +245,10 @@
   resultType: (:char)
   body: YES]
 
+@[HangmanController
+  method: (resignFirstResponder)
+  resultType: (:char)
+  body: NO]
 
 @[HangmanController
   method: (keyDown:(:id)event)
@@ -290,7 +311,8 @@
                                                          ofType: (objcl:objc-string "png")
                                                          inDirectory: (objcl:objc-string "images")]]))
     (if (oclo:nullp image)
-        (let ((pathname  (merge-pathnames (make-pathname :directory '(:relative :up "images")
+        ;; While developping, we refer the resources from the src/ directory:
+        (let ((pathname  (merge-pathnames (make-pathname :directory '(:relative :up "Resources" "images")
                                                          :name (format nil "hung-~D" index)
                                                          :type "png")
                                           (or *compile-file-pathname* *load-pathname* #P"./"))))
@@ -321,12 +343,21 @@
     (case (prog1 (hangman-try-letter game (character letter))
             (set-hang-image hc (hangman-error-count game)))
       (:wins
+       (incf (controller-wins-counter hc))
+       (incf (controller-game-counter hc))
        [(controller-guessed hc) setStringValue: (objcl:objc-string (hangman-word game))]
-       [(controller-message hc) setStringValue: (objcl:objc-string "You win!")]
+       [(controller-message hc) setStringValue: (objcl:objc-string (format nil "You win!~%~D/~D"
+                                                                           (controller-wins-counter hc)
+                                                                           (controller-game-counter hc)))]
+       (provide-word-for-services (hangman-word game))
        (setf (controller-finished hc) t))
       (:loses
+       (incf (controller-game-counter hc))
        [(controller-guessed hc) setStringValue: (objcl:objc-string (hangman-word game))]
-       [(controller-message hc) setStringValue: (objcl:objc-string "You lose!")]
+       [(controller-message hc) setStringValue: (objcl:objc-string (format nil "You lose!~%~D/~D"
+                                                                           (controller-wins-counter hc)
+                                                                           (controller-game-counter hc)))]
+       (provide-word-for-services (hangman-word game))
        (setf (controller-finished hc) t))
       (:alreadyTried
        [(controller-guessed hc) setStringValue: (objcl:objc-string (hangman-found-word game))]
@@ -338,7 +369,12 @@
        [(controller-guessed hc) setStringValue: (objcl:objc-string (hangman-found-word game))]
        [(controller-message hc) setStringValue: (objcl:objc-string "Good guess!")]))))
 
-
+(defun provide-word-for-services (word)
+  ;; This doesn't work. :-(
+  #-(and)
+  (let ((pboard [NSPasteboard pasteboardWithName:#$NSFindPboard]))
+    [pboard clearContents]
+    [pboard setString: (objcl:objc-string word) forType: #$NSPasteboardTypeString]))
 
 
 (defvar *controller*)
@@ -352,7 +388,11 @@
   ;; Setting the controller as NSApplication delegate, will let it
   ;; receive the applicationDidFinishLaunching: message so it may
   ;; complete the application initialization (menus, windows).
-  [[NSApplication sharedApplication] setDelegate:*controller*])
+  [[NSApplication sharedApplication] setDelegate:*controller*]
+  #-(and)
+  (progn ;; to debug the application:
+    (ql:quickload :swank)
+    (funcall (intern "CREATE-SERVER" "SWANK") :port 4099)))
 
 
 ;;;; THE END ;;;;

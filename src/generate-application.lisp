@@ -45,7 +45,7 @@
 
 (defparameter *program-name*      "Hangman")
 (defparameter *release-directory* #P"~/Desktop/")
-(defparameter *version*           "1.0.0")
+(defparameter *version*           "1.0.1")
 (defparameter *copyright*
   "Copyright 2015 Pascal Bourguignon
 License: AGPL3")
@@ -66,51 +66,81 @@ License: AGPL3")
                                              *release-directory*))
 
 
-(let ((dest-dir (merge-pathnames (make-pathname :directory (list :relative
-                                                                 (format nil "~A.app" *program-name*)
-                                                                 "Contents" "Resources" "images")
-                                                :name "test" :type "png")
-                                 *release-directory*))
-      (images   (make-pathname :directory (list :relative :up "images") :name :wild :type "png")))
-  (ensure-directories-exist dest-dir)
-  (dolist (image (directory images))
-    (let ((dest-file (make-pathname :name (pathname-name image) :type (pathname-type image)
+(defun copy-files (files dest-dir)
+  (ensure-directories-exist (make-pathname :name "test" :type "test" :defaults dest-dir))
+  (dolist (file (directory files))
+    (let ((dest-file (make-pathname :name (pathname-name file) :type (pathname-type file)
                                     :defaults dest-dir)))
       (format t "Copying ~A~%" dest-file)
-      (com.informatimago.common-lisp.cesarum.file:copy-file image dest-file
+      (com.informatimago.common-lisp.cesarum.file:copy-file file dest-file
                                                             :element-type '(unsigned-byte 8)
                                                             :if-exists :supersede))))
 
 
+(let ((resources (merge-pathnames (make-pathname :directory (list :relative
+                                                                  (format nil "~A.app" *program-name*)
+                                                                  "Contents" "Resources"))
+                                  *release-directory*)))
+  
+  (copy-files (make-pathname :directory (list :relative :up "Resources" "en.lproj") :name :wild :type :wild)
+              (merge-pathnames #P"en.lproj/" resources))
 
-(defun save-simple-application (&key (name *program-name*) (directory *release-directory*) (creator-string "????"))
+  (copy-files (make-pathname :directory (list :relative :up "Resources" "images") :name :wild :type "png")
+              (merge-pathnames #P"images/" resources))
+
+  (copy-files (make-pathname :directory (list :relative :up "Resources") :name "AppIcon" :type "icns")
+              resources))
+
+
+
+
+(defun save-hangman-application ()
   ;; ccl::build-application
   ;;  calls ccl::save-application
   ;;  calls ccl::%save-application-interal
   ;;  calls ccl::save-image
   #+ccl
   (ccl::build-application               ; This doesn't return.
-   :name name
-   :directory directory
+   :name *program-name*
+   :directory *release-directory*
    :type-string "APPL"
-   :creator-string creator-string
+   :creator-string "SOSH"
    :copy-ide-resources nil              ; whether to copy the IDE's resources
-   :info-plist nil                      ; optional user-defined info-plist
-   :nibfiles '()
-                                        ; a list of user-specified nibfiles
+   :info-plist (com.informatimago.hangman.cocoa::dictionary
+                :|LSApplicationCategoryType| "public.app-category.word-games"
+                :|CFBundleIconFile| "AppIcon.icns"
+                :|CFBundleIdentifier| "com.informatimago.hangman.lisp"
+                :|CFBundleShortVersionString|  (format nil "~A" *version*)
+                :|CFBundleVersion| (format nil "~A ~A" "ccl" (lisp-implementation-version))
+                :|LSMinimumSystemVersion| "10.7"
+                :|CFBundleDevelopmentRegion| "English"
+                :|NSHumanReadableCopyright| (format nil "Copyright 2015 Pascal Bourguignon~%License: AGPL3")
+                ;; :|CFBundleHelpBookFolder| "Resources"
+                ;; :|CFBundleHelpBookName| "HangmanHelp"
+                ;; :|NSAppleScriptEnabled| nil ; not yet.
+                ;; :|CFBundleDocumentTypes| (cf-bundle-document-types)
+                ;; :|UTExportedTypeDeclarations| (exported-type-utis)
+                ;; (dictionary-version $default-info-dictionary-version)
+                ;; (development-region $default-info-plist-development-region)
+                ;; (executable $default-info-plist-executable)
+                ;; (has-localized-display-name $default-info-plist-has-localized-display-name)
+                ;; overriden by write-info-plist, I assume. :|NSMainNibFile| "MainMenu"
+                ;; overriden by write-info-plist (bundle-name $default-info-plist-bundle-name)
+                ;; overriden by write-info-plist (bundle-package-type $default-info-plist-bundle-package-type)
+                ;; overriden by write-info-plist (bundle-signature $default-info-plist-bundle-signature)
+                :|NSPrincipalClass| "LispApplication")
+   :nibfiles '()                        ; a list of user-specified nibfiles
                                         ; to be copied into the app bundle
-   :main-nib-name "MainMenu"
-                                        ; the name of the nib that is to be loaded
-                                        ; as the app's main. this name gets written
-                                        ; into the Info.plist on the "NSMainNibFile" key
+   ;; :main-nib-name "MainMenu"
+   ;;                                      ; the name of the nib that is to be loaded
+   ;;                                      ; as the app's main. this name gets written
+   ;;                                      ; into the Info.plist on the "NSMainNibFile" key
    :private-frameworks '()
    :toplevel-function nil
-   :altconsole nil))                    ; use t for a console for *standard-output*, *error-output*.
+   :altconsole t))                    ; use t for a console for *standard-output*, *error-output*.
 
 
-(save-simple-application :name *program-name*
-                         :directory *release-directory*
-                         :creator-string "SOSH")
+(save-hangman-application)
 
 
 ;;;; THE END ;;;;
