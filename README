@@ -34,6 +34,13 @@ after modifications, one can reset it with:
      (initialize-game *controller*))
 
 
+To run the text UI version in the REPL:
+
+   (push :debugging *features*)
+   (ql:quickload :com.informatimago.hangman.tui)
+   (com.informatimago.hangman.cocoa::play)
+
+
 Production
 ----------
 
@@ -45,6 +52,17 @@ This generates an application package on the desktop named
 Hangman.app, using the generate-application.lisp script.
 
 
+To generate the CLI program, with the Makefile:
+
+
+    make cli
+
+this installs the executable in /usr/local/bin/hangman and the
+resources in /usr/local/games/hangman/.
+
+Note: the cli version should be compilable with any CL implementation;
+update the generate-cli.lisp script with the save lisp image function
+specific to your implementation.
 
 License
 -------
